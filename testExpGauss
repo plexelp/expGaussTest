@@ -1,0 +1,104 @@
+function testExpGauss(fname)
+% ** function testExpGauss(data)
+% testExpGauss test if an exponential gaussian (expgauss) fits some
+% continious data better than the often assumed normal Gaussian.
+% The fits using expgauss and a normal Gaussian are also displayed.
+%
+% USAGE:
+%       testExpGauss(fname)
+%
+% >>> INPUT VARIABLES >>>
+% NAME              TYPE        DESCRIPTION
+% fname             char        input file name
+%
+% To use this script you have to download and extract this package by Yves Lacouture:
+% http://www.fss.ulaval.ca/cms/upload/psy_nouveau/fichiers/distribv2.3.zip
+% 
+% AUTHOR: Marco Rüth, code@marcorueth.com
+
+%% Generate expgauss and normal Gaussian 
+% Add subfunctions for exgauss
+addpath('distribv2.3')
+% Check input
+[~, ~, ext]     = fileparts(fname);
+if strcmp(ext, '.xls')
+    data        = xlsread(fname);
+elseif strcmp(ext, '.mat')
+    load(fname)
+else
+    error('please provide file types .mat or .xls')
+end
+% Calculate parameters
+params          = egfit(data);
+
+%% Plot Gaussian and exponential Gaussian
+% Open figure window
+figure
+plotegfit(data, params, sqrt(length(data)));
+hold on
+% Create normal Gaussian
+gaussNorm       = normpdf(1:length(data), mean(data), std(data));
+
+% Scale plot
+h=get(gca,'Children');
+gaussFactor = max(get(h(1), 'YData')) / max(gaussNorm);
+plot(gaussFactor*gaussNorm)
+
+% Adjust plot properties
+h=get(gca,'Children');
+% Gauss
+set(h(1),'LineWidth',3, 'LineStyle','-.')
+% Expgauss
+set(h(2),'LineWidth',4, 'LineStyle','--')
+% Histogram
+set(h(3),'FaceColor', [0.7 0.6 0.7])
+% Figure
+set(gca,'FontSize', 13)
+set(gcf,'Units','normal')
+set(gcf,'Position',[0.25 0.25 0.5 0.5])
+xlim([min(data)-std(data) max(data) + std(data)])
+
+% Label Plot
+xlabel('Reaction Time [ms]')
+ylabel('Frequency [n]')
+title('Data fit by exponential and normal Gaussian')
+legend('Frequency Histogram','Exponential Gaussian','Normal Gaussian')
+
+%% Likelihood Test
+% Set significance level
+alpha           = .05;
+% Calculate the log likelihood under the assumption of an exponential
+% gaussian distribution with mu, sigma and lambda as parameters
+mu              = params(1);
+sigma           = params(2);
+lambda          = params(3);
+% Compute Likelihoods
+lExgauss        = exgausspdf(mu, sigma, lambda, data);
+% Compute log-likelihood
+llExgauss       = sum(log(lExgauss));
+
+% Calculate the maximum likelihood estimators of mu, sigma
+mu              = mean(data);
+sigma           = std(data);
+% Calculate the log likelihood under the assumption of a normal
+% distribution
+likeNorm        = normpdf(data, mu, sigma);
+llNorm          = sum(log(likeNorm));
+
+% Calculate the log likelihood ratio D according to the following formula:
+% D = -2 ln (likelihood(nullmodel) / likelihood(alternative))
+D               = -2*llNorm + 2*llExgauss;
+
+% Use a Chi^2 test to assess significance:
+% H0: data ~ gauss with 2 parameters: mu, sigma
+% H1: data ~ expgauss with 3 parameters: lambda, mu, sigma
+% df = 3-2
+pChi           = chi2pdf(D, 1);
+
+disp(['Are the data fit better by an exponential Gaussian than a normal Gaussian?'])
+disp(['The p-value for the Chi^2 test is: ', num2str(pChi)])
+if pChi < alpha
+    disp(['The data are described better by an exponential Gaussian than a normal Gaussian. (alpha = ', num2str(pChi) ')'])
+else
+    disp(['The data are described better by an normal Gaussian than a exponential Gaussian. (alpha = ', num2str(pChi) ')'])
+end
